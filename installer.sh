@@ -288,7 +288,7 @@ ask_sudo() {
   echo " $INSTALLER_NAME needs Superuser permissions to continue and run this task."
   echo " Don't worry! I will never use Superuser permissions to do bad things!"
   echo ""
-  
+
   # Check if root permission is granted
   sudo echo " Root privilege status:"
   INSTALLER_SUDO_PRIVILEGE=$(sudo id -u)
@@ -478,13 +478,6 @@ install_add_startup() {
   fi
 }
 
-install_set_python_script() {
-  echo ""
-  echo "Setting scripts..."
-  sudo sed -i "s|/path/to/bing-desktop-wallpaper-changer|$INSTALLPATH|g" "$INSTALLPATH/main.py"
-  sudo sed -i "s|replace with the actual path to the bing-desktop-wallpaper-changer folder|setup done to $INSTALLPATH by $INSTALLER_FULL_NAME|g" "$INSTALLPATH/main.py"
-}
-
 install_remove_unneeded() {
   # Clean up the locally installed BDWC
   echo ""
@@ -518,7 +511,6 @@ install_main() {
   install_symlink
   install_add_desktop_launcher
   install_add_startup
-  install_set_python_script
   install_remove_unneeded
   execute
   info_finish

@@ -14,9 +14,7 @@ import locale
 import os
 import re
 import sys
-
-# replace with the actual path to the bing-desktop-wallpaper-changer folder
-path_to_Bing_Wallpapers = "/path/to/bing-desktop-wallpaper-changer"
+import pathlib
 
 # wait computer internet connection
 os.system("sleep 10")
@@ -414,9 +412,15 @@ def main():
         print(body)
         exit_status = 1
 
-    os.chdir(path_to_Bing_Wallpapers)
-    icon = os.path.abspath("icon.svg")
-    app_notification = Notify.Notification.new(summary, str(body), icon)
+    # os.chdir(path_to_Bing_Wallpapers)
+    # icon = os.path.abspath("icon.svg")
+    path_bing_wallpaper = pathlib.Path(__file__).resolve()
+    icon = path_bing_wallpaper.parent / 'icon.svg'
+    if not icon.exists():
+        # Fallback to set of included icons
+        # Likely in development environment
+        icon = path_bing_wallpaper.parent / 'icon/Bing.svg'
+    app_notification = Notify.Notification.new(summary, str(body), str(icon))
     app_notification.show()
     sys.exit(exit_status)
 
