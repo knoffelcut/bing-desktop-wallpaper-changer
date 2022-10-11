@@ -1,36 +1,29 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
+from configparser import ConfigParser
+from urllib.request import urlretrieve
+from urllib.request import urlopen
+from subprocess import check_output
+from gi.repository import Notify
+from gi.repository import Gtk
+from gi.repository import Gio
+import gi
+import xml.etree.ElementTree as ET
 import locale
 import os
 import re
 import sys
 
 # replace with the actual path to the bing-desktop-wallpaper-changer folder
-path_to_Bing_Wallpapers="/path/to/bing-desktop-wallpaper-changer"
+path_to_Bing_Wallpapers = "/path/to/bing-desktop-wallpaper-changer"
 
 # wait computer internet connection
 os.system("sleep 10")
 
-try:  # try python 3 import
-    from urllib.request import urlopen
-    from urllib.request import urlretrieve
-    from configparser import ConfigParser
-except ImportError:  # fall back to python2
-    from urllib import urlretrieve
-    from urllib2 import urlopen  
-    from ConfigParser import ConfigParser
-
-import xml.etree.ElementTree as ET
-
-import gi
 
 gi.require_version('Gtk', '3.0')
 gi.require_version('Notify', '0.7')
-from gi.repository import Gio
-from gi.repository import Gtk
-from gi.repository import Notify
-from subprocess import check_output
 
 BING_MARKETS = [u'ar-XA',
                 u'bg-BG',
@@ -91,7 +84,7 @@ BING_MARKETS = [u'ar-XA',
                 u'zh-HK',
                 u'zh-TW']
 
-config_file_skeleton ="""[market]
+config_file_skeleton = """[market]
 # If you want to override the current Bing market dectection,
 # set your preferred market here. For a list of markets, see
 # https://msdn.microsoft.com/en-us/library/dd251064.aspx
@@ -101,10 +94,10 @@ area =
 # /home/[user]/[Pictures]/BingWallpapers/
 dir_path =
 # Limit the size of the downloaded image directory
-# Size should be specified in bytes. The minimum 
+# Size should be specified in bytes. The minimum
 # limit is the size of 1 image (whatever size that image is)
 # Set to negative value for unlimit. Default value is 100MiB
-dir_max_size = 
+dir_max_size =
 """
 
 
@@ -120,12 +113,12 @@ def set_gsetting(schema, key, value):
 
 def change_background_gnome(filename):
     set_gsetting('org.gnome.desktop.background', 'picture-uri',
-        get_file_uri(filename))
+                 get_file_uri(filename))
+
 
 def change_background_cinnamon(filename):
     set_gsetting('org.cinnamon.desktop.background', 'picture-uri',
-        get_file_uri(filename))
-
+                 get_file_uri(filename))
 
 
 def get_current_background_gnome_uri():
@@ -133,10 +126,12 @@ def get_current_background_gnome_uri():
     path = gsettings.get_string('picture-uri')
     return path[6:]
 
+
 def get_current_background_cinnamon_uri():
     gsettings = Gio.Settings.new('org.cinnamon.desktop.background')
     path = gsettings.get_string('picture-uri')
     return path[6:]
+
 
 def get_current_background_uri():
     source = Gio.SettingsSchemaSource.get_default()
@@ -146,6 +141,7 @@ def get_current_background_uri():
     else:
         current = get_current_background_gnome_uri()
     return current
+
 
 def change_screensaver(filename):
     set_gsetting('org.gnome.desktop.screensaver', 'picture-uri',
@@ -381,7 +377,7 @@ def main():
         download_path = get_download_path()
         init_dir(download_path)
         image_path = os.path.join(download_path, image_name)
-        
+
         if not os.path.isfile(image_path):
             urlretrieve(image_url, image_path)
             try:
@@ -395,12 +391,12 @@ def main():
             text = str(image_name) + " -- " + str(body) + "\n"
             with open(download_path + "/image-details.txt", "a+") as myfile:
                 myfile.write(text)
-        
+
         elif os.path.samefile(get_current_background_uri(), image_path):
             summary = 'Bing Wallpaper unchanged'
             body = ('%s already exists in Wallpaper directory' %
                     image_metadata.find("copyright").text.encode('utf-8'))
-        
+
         else:
             try:
                 change_background_gnome(image_path)
@@ -411,15 +407,15 @@ def main():
             body = ('%s already exists in Wallpaper directory' %
                     image_metadata.find("copyright").text.encode('utf-8'))
         check_limit()
-        
+
     except Exception as err:
         summary = 'Error executing %s' % app_name
         body = err
         print(body)
         exit_status = 1
-    
+
     os.chdir(path_to_Bing_Wallpapers)
-    icon = os.path.abspath("icon.svg") 
+    icon = os.path.abspath("icon.svg")
     app_notification = Notify.Notification.new(summary, str(body), icon)
     app_notification.show()
     sys.exit(exit_status)
