@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 from configparser import ConfigParser
-from urllib.request import urlretrieve
-from urllib.request import urlopen
+import urllib.request
+import urllib.error
 from subprocess import check_output
 from gi.repository import Notify
 from gi.repository import Gtk
@@ -15,10 +15,7 @@ import os
 import re
 import sys
 import pathlib
-
-# wait computer internet connection
-os.system("sleep 10")
-
+import time
 
 gi.require_version('Gtk', '3.0')
 gi.require_version('Notify', '0.7')
@@ -292,7 +289,7 @@ def get_image_metadata():
     :return: XML tag object for the wallpaper image.
     """
     bing_xml_url = get_bing_xml()
-    page = urlopen(bing_xml_url)
+    page = urllib.request.urlopen(bing_xml_url)
 
     bing_xml = ET.parse(page).getroot()
 
@@ -359,6 +356,22 @@ def check_limit():
         del files[0]
 
 
+def wait_for_internet_connection(url, timeout, timeout_urlopen):
+    time_start = time.monotonic()
+    while True:
+        try:
+            time_loop = time.monotonic()
+            urllib.request.urlopen(url, timeout=timeout_urlopen)
+            break
+        except Exception as e:
+            time_now = time.monotonic()
+            if time_now - time_start > timeout:
+                raise e
+
+            seconds_sleep = max(0, timeout_urlopen - (time_now - time_loop))
+            time.sleep(seconds_sleep)
+
+
 def main():
     """
     Main application entry point.
@@ -366,6 +379,26 @@ def main():
     app_name = 'Bing Desktop Wallpaper'
     Notify.init(app_name)
     exit_status = 0
+
+    try:
+        wait_for_internet_connection('https://www.bing.com', 1, 2)
+    except Exception as err:
+        summary = 'Error executing %s' % app_name
+        body = err
+        print(body)
+        exit_status = 1
+
+        # TODO This is copied code from end of main()
+        # Fix this duplication
+        path_bing_wallpaper = pathlib.Path(__file__).resolve()
+        icon = path_bing_wallpaper.parent / 'icon.svg'
+        if not icon.exists():
+            # Fallback to set of included icons
+            # Likely in development environment
+            icon = path_bing_wallpaper.parent / 'icon/Bing.svg'
+        app_notification = Notify.Notification.new(summary, str(body), str(icon))
+        app_notification.show()
+        sys.exit(exit_status)
 
     try:
         image_metadata = get_image_metadata()
@@ -377,7 +410,7 @@ def main():
         image_path = os.path.join(download_path, image_name)
 
         if not os.path.isfile(image_path):
-            urlretrieve(image_url, image_path)
+            urllib.request.urlretrieve(image_url, image_path)
             try:
                 change_background_gnome(image_path)
             except:
@@ -412,8 +445,6 @@ def main():
         print(body)
         exit_status = 1
 
-    # os.chdir(path_to_Bing_Wallpapers)
-    # icon = os.path.abspath("icon.svg")
     path_bing_wallpaper = pathlib.Path(__file__).resolve()
     icon = path_bing_wallpaper.parent / 'icon.svg'
     if not icon.exists():
