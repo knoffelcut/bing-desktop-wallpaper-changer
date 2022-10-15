@@ -106,40 +106,19 @@ def set_gsetting(schema, key, value):
     gsettings.apply()
 
 
-def change_background_gnome(filename):
-    set_gsetting('org.gnome.desktop.background', 'picture-uri',
+def change_background(filename, desktop_environment):
+    set_gsetting(f'org.{desktop_environment}.desktop.background', 'picture-uri',
                  get_file_uri(filename))
 
 
-def change_background_cinnamon(filename):
-    set_gsetting('org.cinnamon.desktop.background', 'picture-uri',
-                 get_file_uri(filename))
-
-
-def get_current_background_gnome_uri():
-    gsettings = Gio.Settings.new('org.gnome.desktop.background')
+def get_current_background_uri(desktop_environment):
+    gsettings = Gio.Settings.new(f'org.{desktop_environment}.desktop.background')
     path = gsettings.get_string('picture-uri')
-    return path[6:]
+    return path[7:]
 
 
-def get_current_background_cinnamon_uri():
-    gsettings = Gio.Settings.new('org.cinnamon.desktop.background')
-    path = gsettings.get_string('picture-uri')
-    return path[6:]
-
-
-def get_current_background_uri():
-    source = Gio.SettingsSchemaSource.get_default()
-    cinnamon_exists = source.lookup('org.cinnamon.desktop.background', True)
-    if cinnamon_exists:
-        current = get_current_background_cinnamon_uri()
-    else:
-        current = get_current_background_gnome_uri()
-    return current
-
-
-def change_screensaver(filename):
-    set_gsetting('org.gnome.desktop.screensaver', 'picture-uri',
+def change_screensaver(filename, desktop_environment):
+    set_gsetting(f'org.{desktop_environment}.desktop.screensaver', 'picture-uri',
                  get_file_uri(filename))
 
 
@@ -373,12 +352,12 @@ def wait_for_internet_connection(url, timeout, timeout_urlopen):
 
 
 def show_notification(summary: str, body: str, path_icon: pathlib.Path):
-    assert path_icon.exists()
+    path_icon = path_icon if path_icon.exists() else None
     app_notification = Notify.Notification.new(summary, str(body), str(path_icon))
     app_notification.show()
 
 
-def main():
+def main(force: bool, desktop_environment: str):
     """
     Main application entry point.
     """
@@ -392,7 +371,7 @@ def main():
     if not path_icon.exists():
         # Fallback to set of included icons
         # Likely in development environment
-        path_icon = path_bing_wallpaper.parent / 'icon/Bing.svg'
+        path_icon = path_bing_wallpaper.parent.parent / 'icon/Bing.svg'
 
     try:
         wait_for_internet_connection('https://www.bing.com', 1, 2)
@@ -404,6 +383,14 @@ def main():
         show_notification(summary, str(body), path_icon)
         sys.exit(1)
 
+    # Determine desktop environment
+    if desktop_environment is None:
+        desktop_environment = 'gnome'
+        source = Gio.SettingsSchemaSource.get_default()
+        cinnamon_exists = source.lookup('org.cinnamon.desktop.background', True)
+        if cinnamon_exists:
+            desktop_environment = 'cinnamon'
+
     try:
         image_metadata = get_image_metadata()
         image_name = image_metadata.find("startdate").text + ".jpg"
@@ -413,13 +400,10 @@ def main():
         init_dir(download_path)
         image_path = os.path.join(download_path, image_name)
 
-        if not os.path.isfile(image_path):
+        if not os.path.isfile(image_path) or force:
             urllib.request.urlretrieve(image_url, image_path)
-            try:
-                change_background_gnome(image_path)
-            except:
-                change_background_cinnamon(image_path)
-            change_screensaver(image_path)
+            change_background(image_path, desktop_environment)
+            change_screensaver(image_path, 'gnome')
             summary = 'Bing Wallpaper updated successfully'
             body = image_metadata.find("copyright").text.encode('utf-8')
 
@@ -427,17 +411,14 @@ def main():
             with open(download_path + "/image-details.txt", "a+") as myfile:
                 myfile.write(text)
 
-        elif os.path.samefile(get_current_background_uri(), image_path):
+        elif os.path.samefile(get_current_background_uri(desktop_environment), image_path):
             summary = 'Bing Wallpaper unchanged'
             body = ('%s already exists in Wallpaper directory' %
                     image_metadata.find("copyright").text.encode('utf-8'))
 
         else:
-            try:
-                change_background_gnome(image_path)
-            except:
-                change_background_cinnamon(image_path)
-            change_screensaver(image_path)
+            change_background(image_path, desktop_environment)
+            change_screensaver(image_path, 'gnome')
             summary = 'Wallpaper changed to current Bing wallpaper'
             body = ('%s already exists in Wallpaper directory' %
                     image_metadata.find("copyright").text.encode('utf-8'))
@@ -456,4 +437,12 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description='Automatically downloads and changes desktop wallpaper to Bing Photo of the Day.')
+    parser.add_argument('-f', '--force', action='store_true')
+    parser.add_argument('-d', '--desktop_environment', default=None)
+    args = parser.parse_args()
+
+    main(**vars(args))
