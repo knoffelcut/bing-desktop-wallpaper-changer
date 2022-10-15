@@ -372,6 +372,12 @@ def wait_for_internet_connection(url, timeout, timeout_urlopen):
             time.sleep(seconds_sleep)
 
 
+def show_notification(summary: str, body: str, path_icon: pathlib.Path):
+    assert path_icon.exists()
+    app_notification = Notify.Notification.new(summary, str(body), str(path_icon))
+    app_notification.show()
+
+
 def main():
     """
     Main application entry point.
@@ -380,25 +386,23 @@ def main():
     Notify.init(app_name)
     exit_status = 0
 
+    # Setup Notifications
+    path_bing_wallpaper = pathlib.Path(__file__).resolve()
+    path_icon = path_bing_wallpaper.parent / 'icon.svg'
+    if not path_icon.exists():
+        # Fallback to set of included icons
+        # Likely in development environment
+        path_icon = path_bing_wallpaper.parent / 'icon/Bing.svg'
+
     try:
         wait_for_internet_connection('https://www.bing.com', 1, 2)
     except Exception as err:
-        summary = 'Error executing %s' % app_name
-        body = err
-        print(body)
-        exit_status = 1
+        print(err)
 
-        # TODO This is copied code from end of main()
-        # Fix this duplication
-        path_bing_wallpaper = pathlib.Path(__file__).resolve()
-        icon = path_bing_wallpaper.parent / 'icon.svg'
-        if not icon.exists():
-            # Fallback to set of included icons
-            # Likely in development environment
-            icon = path_bing_wallpaper.parent / 'icon/Bing.svg'
-        app_notification = Notify.Notification.new(summary, str(body), str(icon))
-        app_notification.show()
-        sys.exit(exit_status)
+        summary = f'Error executing {app_name}'
+        body = str(err)
+        show_notification(summary, str(body), path_icon)
+        sys.exit(1)
 
     try:
         image_metadata = get_image_metadata()
@@ -439,20 +443,15 @@ def main():
                     image_metadata.find("copyright").text.encode('utf-8'))
         check_limit()
 
+        show_notification(summary, str(body), path_icon)
     except Exception as err:
-        summary = 'Error executing %s' % app_name
-        body = err
-        print(body)
-        exit_status = 1
+        print(err)
 
-    path_bing_wallpaper = pathlib.Path(__file__).resolve()
-    icon = path_bing_wallpaper.parent / 'icon.svg'
-    if not icon.exists():
-        # Fallback to set of included icons
-        # Likely in development environment
-        icon = path_bing_wallpaper.parent / 'icon/Bing.svg'
-    app_notification = Notify.Notification.new(summary, str(body), str(icon))
-    app_notification.show()
+        summary = f'Error executing {app_name}'
+        body = str(err)
+        show_notification(summary, str(body), path_icon)
+        sys.exit(1)
+
     sys.exit(exit_status)
 
 
