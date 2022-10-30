@@ -438,8 +438,8 @@ def main(force: bool, desktop_environment: str, upscale_fancy: bool):
 
     if upscale_fancy:
         try:
+            import shutil
             import skimage.io
-
             import upscale_arbsr
 
             path_background = get_current_background_uri(desktop_environment)
@@ -457,11 +457,11 @@ def main(force: bool, desktop_environment: str, upscale_fancy: bool):
             summary = f'{app_name}: Starting Upscaling'
             body = 'This may take some time'
             show_notification(summary, str(body), path_icon)
-            upscaled = upscale_arbsr.upscale_parts(path_background, maxw, maxh, 4, 4, 128)
+            path_upscaled = upscale_arbsr.upscale_cpu(path_background, maxw, maxh)
 
             path_background_upscaled = pathlib.Path(path_background).parent / \
                 (pathlib.Path(path_background).stem + f'_{maxw}x{maxh}.png')
-            skimage.io.imsave(path_background_upscaled, upscaled)
+            shutil.move(path_upscaled, path_background_upscaled)
 
             change_background(str(path_background_upscaled), desktop_environment)
             change_screensaver(str(path_background_upscaled), 'gnome')

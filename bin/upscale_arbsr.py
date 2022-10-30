@@ -5,13 +5,29 @@ import numpy as np
 import skimage.io  # Preferred over opencv, since it is smaller and we are just doing io (perf not important)
 
 
-def upscale(path_input: str, target_width: int, target_height: int, directory_working: str = '/tmp'):
+def upscale_gpu(path_input: str, target_width: int, target_height: int, directory_working: str = '/tmp'):
     assert pathlib.Path(path_input).exists()
     path_output = pathlib.Path(directory_working) / 'output.png'
     path_output.unlink(missing_ok=True)
     call = [
         'cog', 'predict',
         'r8.im/longguangwang/arbsr@sha256:9e20d2768e62c16716c585a899105a63cd5d36f6be17a208dbc201027325d881',
+        '-i', f'image=@{path_input}',
+        '-i', f'target_width={target_width}',
+        '-i', f'target_height={target_height}',
+    ]
+    subprocess.check_call(call, cwd=str(directory_working))
+    assert path_output.exists()
+    return path_output
+
+
+def upscale_cpu(path_input: str, target_width: int, target_height: int, directory_working: str = '/tmp'):
+    assert pathlib.Path(path_input).exists()
+    path_output = pathlib.Path(directory_working) / 'output.png'
+    path_output.unlink(missing_ok=True)
+    call = [
+        'cog', 'predict',
+        'arbsr-cpu',  # https://github.com/knoffelcut/ArbSR-cpu, build using `cog build -t arbsr-cpu`
         '-i', f'image=@{path_input}',
         '-i', f'target_width={target_width}',
         '-i', f'target_height={target_height}',
@@ -59,7 +75,7 @@ def upscale_parts(
             part_target_height = fy*part.shape[0]
             assert part_target_width == int(part_target_width) and part_target_height == int(part_target_height)
             part_target_width, part_target_height = int(part_target_width), int(part_target_height)
-            path_upscale = upscale(path_part, part_target_width, part_target_height, directory_working)
+            path_upscale = upscale_gpu(path_part, part_target_width, part_target_height, directory_working)
             part_upscale = skimage.io.imread(path_upscale)
 
             # Remove the upscaled overlap sections
