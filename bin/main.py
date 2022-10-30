@@ -80,7 +80,7 @@ BING_MARKETS = [u'ar-XA',
                 u'zh-TW']
 
 config_file_skeleton = """[market]
-# If you want to override the current Bing market dectection,
+# If you want to override the current Bing market detection,
 # set your preferred market here. For a list of markets, see
 # https://msdn.microsoft.com/en-us/library/dd251064.aspx
 area =
@@ -204,6 +204,25 @@ def get_bing_xml():
     return "https://www.bing.com/HPImageArchive.aspx?format=xml&idx=0&n=1&mkt=%s" % market
 
 
+def get_maximum_screen_resolution():
+    window = Gtk.Window()
+    screen = window.get_screen()
+    nmons = screen.get_n_monitors()
+    maxw = 0
+    maxh = 0
+    if nmons == 1:
+        maxw = screen.get_width()
+        maxh = screen.get_height()
+    else:
+        for m in range(nmons):
+            mg = screen.get_monitor_geometry(m)
+            if mg.width > maxw or mg.height > maxw:
+                maxw = mg.width
+                maxh = mg.height
+
+    return maxw, maxh
+
+
 def get_screen_resolution_str():
     """
     Get a regexp like string with your current screen resolution.
@@ -219,27 +238,17 @@ def get_screen_resolution_str():
     default_mobile_w = 1080
     default_mobile_h = 1920
     is_mobile = False
-    window = Gtk.Window()
-    screen = window.get_screen()
-    nmons = screen.get_n_monitors()
-    maxw = 0
-    maxh = 0
-    sizew = 0
-    sizeh = 0
-    if nmons == 1:
-        maxw = screen.get_width()
-        maxh = screen.get_height()
-    else:
-        for m in range(nmons):
-            mg = screen.get_monitor_geometry(m)
-            if mg.width > maxw or mg.height > maxw:
-                maxw = mg.width
-                maxh = mg.height
+
+    maxw, maxh = get_maximum_screen_resolution()
+
     if maxw > maxh:
         v_array = sizes
     else:
         v_array = sizes_mobile
         is_mobile = True
+
+    sizew = 0
+    sizeh = 0
     for m in v_array:
         if maxw <= m[0]:
             sizew = m[0]
@@ -302,15 +311,6 @@ def init_dir(path):
         os.makedirs(path)
 
 
-# def p3_dirscan(path):
-#     files = list()
-#     size = 0
-#     for entry in os.scandir(path):
-#         if entry.is_file() and os.path.splitext(entry.name)[1] == "jpg":
-#             files.append(entry)
-#             size = size + entry.stat.st_size;
-#     return files, size
-
 def p2_dirscan(path):
     files = list()
     size = 0
@@ -357,7 +357,7 @@ def show_notification(summary: str, body: str, path_icon: pathlib.Path):
     app_notification.show()
 
 
-def main(force: bool, desktop_environment: str):
+def main(force: bool, desktop_environment: str, upscale_fancy: bool):
     """
     Main application entry point.
     """
@@ -433,6 +433,46 @@ def main(force: bool, desktop_environment: str):
         show_notification(summary, str(body), path_icon)
         sys.exit(1)
 
+    if upscale_fancy:
+        try:
+            import skimage.io
+
+            import upscale_arbsr
+
+            path_background = get_current_background_uri(desktop_environment)
+
+            background = skimage.io.imread(path_background)
+            background_height = background.shape[0]
+            background_width = background.shape[1]
+
+            maxw, maxh = get_maximum_screen_resolution()
+            f = max((maxw/background_width), (maxh/background_height))
+            maxw, maxh = int(round(background_width*f)), int(round(background_height*f))
+            assert maxw > background_width and maxh > background_height
+            del background
+
+            summary = f'{app_name}: Starting Upscaling'
+            body = 'This may take some time'
+            show_notification(summary, str(body), path_icon)
+            upscaled = upscale_arbsr.upscale_parts(path_background, maxw, maxh, 4, 4, 128)
+
+            path_background_upscaled = pathlib.Path(path_background).parent / \
+                (pathlib.Path(path_background).stem + f'_{maxw}x{maxh}.png')
+            skimage.io.imsave(path_background_upscaled, upscaled)
+
+            change_background(str(path_background_upscaled), desktop_environment)
+            change_screensaver(str(path_background_upscaled), 'gnome')
+
+            summary = f'{app_name}: Successfully upscaled'
+            body = f'From {background_width}x{background_height} to {maxw}x{maxh}'
+            show_notification(summary, str(body), path_icon)
+        except Exception as err:
+            print(err)
+
+            summary = f'Warning {app_name}'
+            body = f'Error Upscaling {image_path}\n' + str(err)
+            show_notification(summary, str(body), path_icon)
+
     sys.exit(exit_status)
 
 
@@ -443,6 +483,7 @@ if __name__ == '__main__':
         description='Automatically downloads and changes desktop wallpaper to Bing Photo of the Day.')
     parser.add_argument('-f', '--force', action='store_true')
     parser.add_argument('-d', '--desktop_environment', default=None)
+    parser.add_argument('-u', '--upscale-fancy', action='store_true')
     args = parser.parse_args()
 
     main(**vars(args))
