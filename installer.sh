@@ -415,6 +415,7 @@ install_system() {
   sudo cp -Rvf * $INSTALLPATH
   # Restore main.py to original directory
   sudo mv -vf $INSTALLPATH/bin/main.py $INSTALLPATH/main.py
+  sudo mv -vf $INSTALLPATH/bin/upscale_arbsr.py $INSTALLPATH/upscale_arbsr.py
 }
 
 install_set_files() {
@@ -491,9 +492,9 @@ execute() {
   echo ""
   echo "Executing $NAME..."
   if [ $PYSYMLINK == true ]; then
-      python $LINKTO/$TERMNAME
+      python3 $LINKTO/$TERMNAME
   else
-      python $INSTALLPATH/main.py
+      python3 $INSTALLPATH/main.py
   fi
 }
 
