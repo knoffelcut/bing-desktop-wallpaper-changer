@@ -411,7 +411,10 @@ def main(force: bool, desktop_environment: str, upscale_fancy: bool):
             with open(download_path + "/image-details.txt", "a+") as myfile:
                 myfile.write(text)
 
-        elif os.path.samefile(get_current_background_uri(desktop_environment), image_path):
+        elif (
+            os.path.exists(get_current_background_uri(desktop_environment)) and
+            os.path.samefile(get_current_background_uri(desktop_environment), image_path)
+        ):
             summary = 'Bing Wallpaper unchanged'
             body = ('%s already exists in Wallpaper directory' %
                     image_metadata.find("copyright").text.encode('utf-8'))
