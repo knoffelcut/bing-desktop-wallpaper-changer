@@ -409,7 +409,11 @@ def main(force: bool, desktop_environment: str, upscale_fancy: bool):
 
         elif (
             get_current_background_uri(desktop_environment).exists() and
-            get_current_background_uri(desktop_environment).samefile(image_path)
+            (get_current_background_uri(desktop_environment).samefile(image_path) or
+             (get_current_background_uri(desktop_environment).parent /
+             '_'.join(get_current_background_uri(desktop_environment).stem.split('_')[:-1])).with_suffix('.jpg')
+                .samefile(image_path)
+             )
         ):
             summary = 'Bing Wallpaper unchanged'
             body = ('%s already exists in Wallpaper directory' %
@@ -438,22 +442,22 @@ def main(force: bool, desktop_environment: str, upscale_fancy: bool):
             import skimage.io
             import upscale_arbsr
 
-            path_background = get_current_background_uri(desktop_environment)
-
+            path_background = image_path
             background = skimage.io.imread(path_background)
             background_height = background.shape[0]
             background_width = background.shape[1]
+            del background
 
             maxw, maxh = get_maximum_screen_resolution()
             f = max((maxw/background_width), (maxh/background_height))
             maxw, maxh = int(round(background_width*f)), int(round(background_height*f))
-            assert maxw > background_width and maxh > background_height
-            del background
 
             path_background_upscaled = pathlib.Path(path_background).parent / \
                 (pathlib.Path(path_background).stem + f'_{maxw}x{maxh}.png')
 
             if (not path_background_upscaled.exists()) or force:
+                assert maxw > background_width and maxh > background_height
+
                 summary = f'{app_name}: Starting Upscaling'
                 body = 'This may take some time'
                 show_notification(summary, str(body), path_icon)
@@ -469,8 +473,8 @@ def main(force: bool, desktop_environment: str, upscale_fancy: bool):
                 body = f'filename: {path_background_upscaled.name}'
                 show_notification(summary, str(body), path_icon)
 
-            change_background(str(path_background_upscaled), desktop_environment)
-            change_screensaver(str(path_background_upscaled), 'gnome')
+            change_background(path_background_upscaled, desktop_environment)
+            change_screensaver(path_background_upscaled, 'gnome')
         except Exception as err:
             print(err)
 
