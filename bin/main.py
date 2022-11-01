@@ -11,7 +11,6 @@ from gi.repository import Gio
 import gi
 import xml.etree.ElementTree as ET
 import locale
-import os
 import re
 import sys
 import pathlib
@@ -97,7 +96,7 @@ dir_max_size =
 
 
 def get_file_uri(filename):
-    return 'file://%s' % filename
+    return f'file://{filename}'
 
 
 def set_gsetting(schema, key, value):
@@ -114,7 +113,7 @@ def change_background(filename, desktop_environment):
 def get_current_background_uri(desktop_environment):
     gsettings = Gio.Settings.new(f'org.{desktop_environment}.desktop.background')
     path = gsettings.get_string('picture-uri')
-    return path[7:]
+    return pathlib.Path(path[7:])
 
 
 def change_screensaver(filename, desktop_environment):
@@ -128,11 +127,10 @@ def get_config_file():
 
     :return: Path to the program's config file.
     """
-    config_dir = os.path.join(os.path.expanduser('~'), '.config',
-                              'bing-desktop-wallpaper-changer')
+    config_dir = pathlib.Path.home() / '.config/bing-desktop-wallpaper-changer'
     init_dir(config_dir)
-    config_path = os.path.join(config_dir, 'config.ini')
-    if not os.path.isfile(config_path):
+    config_path = config_dir / 'config.ini'
+    if not config_path.is_file():
         with open(config_path, 'w') as config_file:
             config_file.write(config_file_skeleton)
     return config_path
@@ -172,9 +170,9 @@ def get_download_path():
         config.read(get_config_file())
         path = config.get('directory', 'dir_path')
 
-        return path or default_path
+        return pathlib.Path(path or default_path)
     except Exception:
-        return default_path
+        return pathlib.Path(default_path)
 
 
 def get_directory_limit():
@@ -201,7 +199,7 @@ def get_bing_xml():
     # n = Number of images previous the day given by idx
     # mkt = Bing Market Area, see get_valid_bing_markets.
     market = get_market()
-    return "https://www.bing.com/HPImageArchive.aspx?format=xml&idx=0&n=1&mkt=%s" % market
+    return f"https://www.bing.com/HPImageArchive.aspx?format=xml&idx=0&n=1&mkt={market}"
 
 
 def get_maximum_screen_resolution():
@@ -267,7 +265,7 @@ def get_screen_resolution_str():
             sizew = default_w
             sizeh = default_h
 
-    return r'%sx%s' % (sizew, sizeh)
+    return f'{sizew:d}x{sizeh:d}'
 
 
 def get_image_metadata():
@@ -301,24 +299,22 @@ def get_image_url(metadata):
     return "https://www.bing.com" + correct_resolution_image
 
 
-def init_dir(path):
+def init_dir(path: pathlib.Path):
     """
     Create directory if it doesn't exist.
 
     :param path: Path to a directory.
     """
-    if not os.path.exists(path):
-        os.makedirs(path)
+    path.mkdir(parents=True, exist_ok=True)
 
 
 def p2_dirscan(path):
     files = list()
     size = 0
 
-    for e in os.listdir(path):
-        entry = path + "/" + e
-        if os.path.isfile(entry) and os.path.splitext(entry)[1] == ".jpg":
-            s = os.path.getsize(entry)
+    for entry in path.iterdir():
+        if entry.is_file() and entry.suffix in {'.jpg', '.png'}:
+            s = entry.stat().st_size
             files.append((entry, s))
             size = size + s
     files = sorted(files)
@@ -330,7 +326,7 @@ def check_limit():
     (files, size) = p2_dirscan(download_path)
     max_size = get_directory_limit()
     while (max_size > 0 and size > max_size and len(files) > 1):
-        os.remove(files[0][0])
+        files[0][0].unlink()
         size = size - files[0][1]
         del files[0]
 
@@ -398,9 +394,9 @@ def main(force: bool, desktop_environment: str, upscale_fancy: bool):
 
         download_path = get_download_path()
         init_dir(download_path)
-        image_path = os.path.join(download_path, image_name)
+        image_path = download_path / image_name
 
-        if not os.path.isfile(image_path) or force:
+        if not image_path.is_file() or force:
             urllib.request.urlretrieve(image_url, image_path)
             change_background(image_path, desktop_environment)
             change_screensaver(image_path, 'gnome')
@@ -412,8 +408,8 @@ def main(force: bool, desktop_environment: str, upscale_fancy: bool):
                 myfile.write(text)
 
         elif (
-            os.path.exists(get_current_background_uri(desktop_environment)) and
-            os.path.samefile(get_current_background_uri(desktop_environment), image_path)
+            get_current_background_uri(desktop_environment).exists() and
+            get_current_background_uri(desktop_environment).samefile(image_path)
         ):
             summary = 'Bing Wallpaper unchanged'
             body = ('%s already exists in Wallpaper directory' %
@@ -469,7 +465,7 @@ def main(force: bool, desktop_environment: str, upscale_fancy: bool):
                 body = f'From {background_width}x{background_height} to {maxw}x{maxh}'
                 show_notification(summary, str(body), path_icon)
             else:
-                summary = f'{app_name}: Upscaled background already exist'
+                summary = f'{app_name}: Upscaled background already exists'
                 body = f'filename: {path_background_upscaled.name}'
                 show_notification(summary, str(body), path_icon)
 
