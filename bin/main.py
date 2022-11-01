@@ -454,21 +454,27 @@ def main(force: bool, desktop_environment: str, upscale_fancy: bool):
             assert maxw > background_width and maxh > background_height
             del background
 
-            summary = f'{app_name}: Starting Upscaling'
-            body = 'This may take some time'
-            show_notification(summary, str(body), path_icon)
-            path_upscaled = upscale_arbsr.upscale_cpu(path_background, maxw, maxh)
-
             path_background_upscaled = pathlib.Path(path_background).parent / \
                 (pathlib.Path(path_background).stem + f'_{maxw}x{maxh}.png')
-            shutil.move(path_upscaled, path_background_upscaled)
+
+            if (not path_background_upscaled.exists()) or force:
+                summary = f'{app_name}: Starting Upscaling'
+                body = 'This may take some time'
+                show_notification(summary, str(body), path_icon)
+                path_upscaled = upscale_arbsr.upscale_cpu(path_background, maxw, maxh)
+
+                shutil.move(path_upscaled, path_background_upscaled)
+
+                summary = f'{app_name}: Successfully upscaled'
+                body = f'From {background_width}x{background_height} to {maxw}x{maxh}'
+                show_notification(summary, str(body), path_icon)
+            else:
+                summary = f'{app_name}: Upscaled background already exist'
+                body = f'filename: {path_background_upscaled.name}'
+                show_notification(summary, str(body), path_icon)
 
             change_background(str(path_background_upscaled), desktop_environment)
             change_screensaver(str(path_background_upscaled), 'gnome')
-
-            summary = f'{app_name}: Successfully upscaled'
-            body = f'From {background_width}x{background_height} to {maxw}x{maxh}'
-            show_notification(summary, str(body), path_icon)
         except Exception as err:
             print(err)
 
