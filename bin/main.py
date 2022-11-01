@@ -473,8 +473,17 @@ def main(force: bool, desktop_environment: str, upscale_fancy: bool):
                 body = f'filename: {path_background_upscaled.name}'
                 show_notification(summary, str(body), path_icon)
 
-            change_background(path_background_upscaled, desktop_environment)
-            change_screensaver(path_background_upscaled, 'gnome')
+            if get_current_background_uri(desktop_environment).samefile(path_background_upscaled):
+                summary = f'{app_name}: Upscaled background already set'
+                body = f'filename: {path_background_upscaled.name}'
+                show_notification(summary, str(body), path_icon)
+            else:
+                change_background(path_background_upscaled, desktop_environment)
+                change_screensaver(path_background_upscaled, 'gnome')
+
+                summary = f'{app_name}: Set to upscaled background'
+                body = f'filename: {path_background_upscaled.name}'
+                show_notification(summary, str(body), path_icon)
         except Exception as err:
             print(err)
 
