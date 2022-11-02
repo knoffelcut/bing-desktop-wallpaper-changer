@@ -354,6 +354,17 @@ ask_config() {
       STARTUP=false
   fi
 
+  # auto Upscale
+  echo ""
+  echo "Should $NAME automatically run upscaling upon (autostart/run from desktop launcher)?"
+  echo -n "  Automatically upscale (y/n)? : "
+  read answer
+  if echo "$answer" | grep -iq "^y" ;then
+      UPSCALE=-u
+  else
+      UPSCALE=false
+  fi
+
   # Icon
   echo ""
   if [ $DESKTOP == true ]; then
@@ -423,11 +434,11 @@ install_set_files() {
   echo "Setting desktop files..."
 
   if [ $PYSYMLINK == true ]; then
-    sudo sed -i "s|Exec=[/a-z/a-z]*|Exec=$LINKTO/$TERMNAME|g" "$INSTALLPATH/bin/bdwc-launcher.desktop"
-    sudo sed -i "s|Exec=[/a-z/a-z]*|Exec=$LINKTO/$TERMNAME|g" "$INSTALLPATH/bin/bdwc-autostart.desktop"
+    sudo sed -i "s|Exec=[/a-z/a-z]*|Exec=$LINKTO/$TERMNAME ${UPSCALE}|g" "$INSTALLPATH/bin/bdwc-launcher.desktop"
+    sudo sed -i "s|Exec=[/a-z/a-z]*|Exec=$LINKTO/$TERMNAME ${UPSCALE}|g" "$INSTALLPATH/bin/bdwc-autostart.desktop"
   else
-	sudo sed -i "s|Exec=[/a-z/a-z]*|Exec=$INSTALLPATH/main.py|g" "$INSTALLPATH/bin/bdwc-launcher.desktop"
-	sudo sed -i "s|Exec=[/a-z/a-z]*|Exec=$INSTALLPATH/main.py|g" "$INSTALLPATH/bin/bdwc-autostart.desktop"
+	sudo sed -i "s|Exec=[/a-z/a-z]*|Exec=$INSTALLPATH/main.py ${UPSCALE}|g" "$INSTALLPATH/bin/bdwc-launcher.desktop"
+	sudo sed -i "s|Exec=[/a-z/a-z]*|Exec=$INSTALLPATH/main.py ${UPSCALE}|g" "$INSTALLPATH/bin/bdwc-autostart.desktop"
   fi
 
   echo "File setup done."
@@ -492,9 +503,9 @@ execute() {
   echo ""
   echo "Executing $NAME..."
   if [ $PYSYMLINK == true ]; then
-      python3 $LINKTO/$TERMNAME
+      python3 $LINKTO/$TERMNAME ${UPSCALE}
   else
-      python3 $INSTALLPATH/main.py
+      python3 $INSTALLPATH/main.py ${UPSCALE}
   fi
 }
 
