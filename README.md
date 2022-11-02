@@ -1,6 +1,14 @@
 # Bing Desktop Wallpaper Changer
 Automatically downloads and changes desktop wallpaper to Bing Photo of the Day.
 
+This is a fork of the archived repo [Bing Desktop Wallpaper Changer](https://github.com/UtkarshGpta/bing-desktop-wallpaper-changer).
+Updates and modifications include:
+- Use [ArbSR-cpu](https://github.com/knoffelcut/ArbSR-cpu) to upscale from 1080p/HD to higher resolutions (e.g. QHD, 4k(untested)).
+- Remove Python2 support.
+- Migrate from os.path to pathlib.
+- Check for internet connection, instead of constant wait.
+- Fix some bugs where gnome functions is used for cinnamon DEs.
+
 ## Synopsis
 Python Script for automatically downloading and changing the desktop wallpaper to Bing Photo of the day. The script runs automatically at the startup and works on GNU/Linux with Gnome or Cinnamon. Works perfectly on Ubuntu and Linux Mint.
 
@@ -21,7 +29,7 @@ Example:
 
 ```ini
 [market]
-# If you want to override the current Bing market dectection,
+# If you want to override the current Bing market detection,
 # set your preferred market here. For a list of markets, see
 # https://msdn.microsoft.com/en-us/library/dd251064.aspx
 area = 'bg-BG'
@@ -109,7 +117,6 @@ P.S. The Installer has a easter egg! (Any new easter egg ideas is welcome) Try:
 
 ## To do
 - [ ] When installing, Ask user about : Schedule with crontab, Limit the size of all downloaded wallpapers, Start with timer
-- [ ] Installer support for *rpm*-using distros (50% done - added support, but it will probably not work. needs feedback)
 
 *Any other suggestions welcome!*
 
@@ -118,6 +125,3 @@ Utkarsh Gupta and [Contributors](https://github.com/UtkarshGpta/bing-desktop-wal
 
 ## License
 [MIT license](http://opensource.org/licenses/mit-license.php).
-
-## Note
-If you're on GNOME, you can use this [extension](https://extensions.gnome.org/extension/1262/bing-wallpaper-changer/) by [neffo](https://github.com/neffo) which makes use of this script. I am using it myself. Peace :D
