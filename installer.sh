@@ -288,7 +288,7 @@ ask_sudo() {
   echo " $INSTALLER_NAME needs Superuser permissions to continue and run this task."
   echo " Don't worry! I will never use Superuser permissions to do bad things!"
   echo ""
-  
+
   # Check if root permission is granted
   sudo echo " Root privilege status:"
   INSTALLER_SUDO_PRIVILEGE=$(sudo id -u)
@@ -354,6 +354,17 @@ ask_config() {
       STARTUP=false
   fi
 
+  # auto Upscale
+  echo ""
+  echo "Should $NAME automatically run upscaling upon (autostart/run from desktop launcher)?"
+  echo -n "  Automatically upscale (y/n)? : "
+  read answer
+  if echo "$answer" | grep -iq "^y" ;then
+      UPSCALE=-u
+  else
+      UPSCALE=false
+  fi
+
   # Icon
   echo ""
   if [ $DESKTOP == true ]; then
@@ -415,6 +426,7 @@ install_system() {
   sudo cp -Rvf * $INSTALLPATH
   # Restore main.py to original directory
   sudo mv -vf $INSTALLPATH/bin/main.py $INSTALLPATH/main.py
+  sudo mv -vf $INSTALLPATH/bin/upscale_arbsr.py $INSTALLPATH/upscale_arbsr.py
 }
 
 install_set_files() {
@@ -422,11 +434,11 @@ install_set_files() {
   echo "Setting desktop files..."
 
   if [ $PYSYMLINK == true ]; then
-    sudo sed -i "s|Exec=[/a-z/a-z]*|Exec=$LINKTO/$TERMNAME|g" "$INSTALLPATH/bin/bdwc-launcher.desktop"
-    sudo sed -i "s|Exec=[/a-z/a-z]*|Exec=$LINKTO/$TERMNAME|g" "$INSTALLPATH/bin/bdwc-autostart.desktop"
+    sudo sed -i "s|Exec=[/a-z/a-z]*|Exec=$LINKTO/$TERMNAME ${UPSCALE}|g" "$INSTALLPATH/bin/bdwc-launcher.desktop"
+    sudo sed -i "s|Exec=[/a-z/a-z]*|Exec=$LINKTO/$TERMNAME ${UPSCALE}|g" "$INSTALLPATH/bin/bdwc-autostart.desktop"
   else
-	sudo sed -i "s|Exec=[/a-z/a-z]*|Exec=$INSTALLPATH/main.py|g" "$INSTALLPATH/bin/bdwc-launcher.desktop"
-	sudo sed -i "s|Exec=[/a-z/a-z]*|Exec=$INSTALLPATH/main.py|g" "$INSTALLPATH/bin/bdwc-autostart.desktop"
+	sudo sed -i "s|Exec=[/a-z/a-z]*|Exec=$INSTALLPATH/main.py ${UPSCALE}|g" "$INSTALLPATH/bin/bdwc-launcher.desktop"
+	sudo sed -i "s|Exec=[/a-z/a-z]*|Exec=$INSTALLPATH/main.py ${UPSCALE}|g" "$INSTALLPATH/bin/bdwc-autostart.desktop"
   fi
 
   echo "File setup done."
@@ -478,13 +490,6 @@ install_add_startup() {
   fi
 }
 
-install_set_python_script() {
-  echo ""
-  echo "Setting scripts..."
-  sudo sed -i "s|/path/to/bing-desktop-wallpaper-changer|$INSTALLPATH|g" "$INSTALLPATH/main.py"
-  sudo sed -i "s|replace with the actual path to the bing-desktop-wallpaper-changer folder|setup done to $INSTALLPATH by $INSTALLER_FULL_NAME|g" "$INSTALLPATH/main.py"
-}
-
 install_remove_unneeded() {
   # Clean up the locally installed BDWC
   echo ""
@@ -498,9 +503,9 @@ execute() {
   echo ""
   echo "Executing $NAME..."
   if [ $PYSYMLINK == true ]; then
-      python $LINKTO/$TERMNAME
+      python3 $LINKTO/$TERMNAME ${UPSCALE}
   else
-      python $INSTALLPATH/main.py
+      python3 $INSTALLPATH/main.py ${UPSCALE}
   fi
 }
 
@@ -518,7 +523,6 @@ install_main() {
   install_symlink
   install_add_desktop_launcher
   install_add_startup
-  install_set_python_script
   install_remove_unneeded
   execute
   info_finish

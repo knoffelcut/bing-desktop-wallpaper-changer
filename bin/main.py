@@ -1,36 +1,23 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
+from configparser import ConfigParser
+import urllib.request
+import urllib.error
+from subprocess import check_output
+from gi.repository import Notify
+from gi.repository import Gtk
+from gi.repository import Gio
+import gi
+import xml.etree.ElementTree as ET
 import locale
-import os
 import re
 import sys
-
-# replace with the actual path to the bing-desktop-wallpaper-changer folder
-path_to_Bing_Wallpapers="/path/to/bing-desktop-wallpaper-changer"
-
-# wait computer internet connection
-os.system("sleep 10")
-
-try:  # try python 3 import
-    from urllib.request import urlopen
-    from urllib.request import urlretrieve
-    from configparser import ConfigParser
-except ImportError:  # fall back to python2
-    from urllib import urlretrieve
-    from urllib2 import urlopen  
-    from ConfigParser import ConfigParser
-
-import xml.etree.ElementTree as ET
-
-import gi
+import pathlib
+import time
 
 gi.require_version('Gtk', '3.0')
 gi.require_version('Notify', '0.7')
-from gi.repository import Gio
-from gi.repository import Gtk
-from gi.repository import Notify
-from subprocess import check_output
 
 BING_MARKETS = [u'ar-XA',
                 u'bg-BG',
@@ -91,8 +78,8 @@ BING_MARKETS = [u'ar-XA',
                 u'zh-HK',
                 u'zh-TW']
 
-config_file_skeleton ="""[market]
-# If you want to override the current Bing market dectection,
+config_file_skeleton = """[market]
+# If you want to override the current Bing market detection,
 # set your preferred market here. For a list of markets, see
 # https://msdn.microsoft.com/en-us/library/dd251064.aspx
 area =
@@ -101,15 +88,15 @@ area =
 # /home/[user]/[Pictures]/BingWallpapers/
 dir_path =
 # Limit the size of the downloaded image directory
-# Size should be specified in bytes. The minimum 
+# Size should be specified in bytes. The minimum
 # limit is the size of 1 image (whatever size that image is)
 # Set to negative value for unlimit. Default value is 100MiB
-dir_max_size = 
+dir_max_size =
 """
 
 
 def get_file_uri(filename):
-    return 'file://%s' % filename
+    return f'file://{filename}'
 
 
 def set_gsetting(schema, key, value):
@@ -118,37 +105,19 @@ def set_gsetting(schema, key, value):
     gsettings.apply()
 
 
-def change_background_gnome(filename):
-    set_gsetting('org.gnome.desktop.background', 'picture-uri',
-        get_file_uri(filename))
-
-def change_background_cinnamon(filename):
-    set_gsetting('org.cinnamon.desktop.background', 'picture-uri',
-        get_file_uri(filename))
+def change_background(filename, desktop_environment):
+    set_gsetting(f'org.{desktop_environment}.desktop.background', 'picture-uri',
+                 get_file_uri(filename))
 
 
-
-def get_current_background_gnome_uri():
-    gsettings = Gio.Settings.new('org.gnome.desktop.background')
+def get_current_background_uri(desktop_environment):
+    gsettings = Gio.Settings.new(f'org.{desktop_environment}.desktop.background')
     path = gsettings.get_string('picture-uri')
-    return path[6:]
+    return pathlib.Path(path[7:])
 
-def get_current_background_cinnamon_uri():
-    gsettings = Gio.Settings.new('org.cinnamon.desktop.background')
-    path = gsettings.get_string('picture-uri')
-    return path[6:]
 
-def get_current_background_uri():
-    source = Gio.SettingsSchemaSource.get_default()
-    cinnamon_exists = source.lookup('org.cinnamon.desktop.background', True)
-    if cinnamon_exists:
-        current = get_current_background_cinnamon_uri()
-    else:
-        current = get_current_background_gnome_uri()
-    return current
-
-def change_screensaver(filename):
-    set_gsetting('org.gnome.desktop.screensaver', 'picture-uri',
+def change_screensaver(filename, desktop_environment):
+    set_gsetting(f'org.{desktop_environment}.desktop.screensaver', 'picture-uri',
                  get_file_uri(filename))
 
 
@@ -158,11 +127,10 @@ def get_config_file():
 
     :return: Path to the program's config file.
     """
-    config_dir = os.path.join(os.path.expanduser('~'), '.config',
-                              'bing-desktop-wallpaper-changer')
+    config_dir = pathlib.Path.home() / '.config/bing-desktop-wallpaper-changer'
     init_dir(config_dir)
-    config_path = os.path.join(config_dir, 'config.ini')
-    if not os.path.isfile(config_path):
+    config_path = config_dir / 'config.ini'
+    if not config_path.is_file():
         with open(config_path, 'w') as config_file:
             config_file.write(config_file_skeleton)
     return config_path
@@ -202,9 +170,9 @@ def get_download_path():
         config.read(get_config_file())
         path = config.get('directory', 'dir_path')
 
-        return path or default_path
+        return pathlib.Path(path or default_path)
     except Exception:
-        return default_path
+        return pathlib.Path(default_path)
 
 
 def get_directory_limit():
@@ -231,7 +199,26 @@ def get_bing_xml():
     # n = Number of images previous the day given by idx
     # mkt = Bing Market Area, see get_valid_bing_markets.
     market = get_market()
-    return "https://www.bing.com/HPImageArchive.aspx?format=xml&idx=0&n=1&mkt=%s" % market
+    return f"https://www.bing.com/HPImageArchive.aspx?format=xml&idx=0&n=1&mkt={market}"
+
+
+def get_maximum_screen_resolution():
+    window = Gtk.Window()
+    screen = window.get_screen()
+    nmons = screen.get_n_monitors()
+    maxw = 0
+    maxh = 0
+    if nmons == 1:
+        maxw = screen.get_width()
+        maxh = screen.get_height()
+    else:
+        for m in range(nmons):
+            mg = screen.get_monitor_geometry(m)
+            if mg.width > maxw or mg.height > maxw:
+                maxw = mg.width
+                maxh = mg.height
+
+    return maxw, maxh
 
 
 def get_screen_resolution_str():
@@ -249,27 +236,17 @@ def get_screen_resolution_str():
     default_mobile_w = 1080
     default_mobile_h = 1920
     is_mobile = False
-    window = Gtk.Window()
-    screen = window.get_screen()
-    nmons = screen.get_n_monitors()
-    maxw = 0
-    maxh = 0
-    sizew = 0
-    sizeh = 0
-    if nmons == 1:
-        maxw = screen.get_width()
-        maxh = screen.get_height()
-    else:
-        for m in range(nmons):
-            mg = screen.get_monitor_geometry(m)
-            if mg.width > maxw or mg.height > maxw:
-                maxw = mg.width
-                maxh = mg.height
+
+    maxw, maxh = get_maximum_screen_resolution()
+
     if maxw > maxh:
         v_array = sizes
     else:
         v_array = sizes_mobile
         is_mobile = True
+
+    sizew = 0
+    sizeh = 0
     for m in v_array:
         if maxw <= m[0]:
             sizew = m[0]
@@ -288,7 +265,7 @@ def get_screen_resolution_str():
             sizew = default_w
             sizeh = default_h
 
-    return r'%sx%s' % (sizew, sizeh)
+    return f'{sizew:d}x{sizeh:d}'
 
 
 def get_image_metadata():
@@ -298,7 +275,7 @@ def get_image_metadata():
     :return: XML tag object for the wallpaper image.
     """
     bing_xml_url = get_bing_xml()
-    page = urlopen(bing_xml_url)
+    page = urllib.request.urlopen(bing_xml_url)
 
     bing_xml = ET.parse(page).getroot()
 
@@ -322,33 +299,22 @@ def get_image_url(metadata):
     return "https://www.bing.com" + correct_resolution_image
 
 
-def init_dir(path):
+def init_dir(path: pathlib.Path):
     """
     Create directory if it doesn't exist.
 
     :param path: Path to a directory.
     """
-    if not os.path.exists(path):
-        os.makedirs(path)
+    path.mkdir(parents=True, exist_ok=True)
 
-
-# def p3_dirscan(path):
-#     files = list()
-#     size = 0
-#     for entry in os.scandir(path):
-#         if entry.is_file() and os.path.splitext(entry.name)[1] == "jpg":
-#             files.append(entry)
-#             size = size + entry.stat.st_size;
-#     return files, size
 
 def p2_dirscan(path):
     files = list()
     size = 0
 
-    for e in os.listdir(path):
-        entry = path + "/" + e
-        if os.path.isfile(entry) and os.path.splitext(entry)[1] == ".jpg":
-            s = os.path.getsize(entry)
+    for entry in path.iterdir():
+        if entry.is_file() and entry.suffix in {'.jpg', '.png'}:
+            s = entry.stat().st_size
             files.append((entry, s))
             size = size + s
     files = sorted(files)
@@ -360,18 +326,66 @@ def check_limit():
     (files, size) = p2_dirscan(download_path)
     max_size = get_directory_limit()
     while (max_size > 0 and size > max_size and len(files) > 1):
-        os.remove(files[0][0])
+        files[0][0].unlink()
         size = size - files[0][1]
         del files[0]
 
 
-def main():
+def wait_for_internet_connection(url, timeout, timeout_urlopen):
+    time_start = time.monotonic()
+    while True:
+        try:
+            time_loop = time.monotonic()
+            urllib.request.urlopen(url, timeout=timeout_urlopen)
+            break
+        except Exception as e:
+            time_now = time.monotonic()
+            if time_now - time_start > timeout:
+                raise e
+
+            seconds_sleep = max(0, timeout_urlopen - (time_now - time_loop))
+            time.sleep(seconds_sleep)
+
+
+def show_notification(summary: str, body: str, path_icon: pathlib.Path):
+    path_icon = path_icon if path_icon.exists() else None
+    app_notification = Notify.Notification.new(summary, str(body), str(path_icon))
+    app_notification.show()
+
+
+def main(force: bool, desktop_environment: str, upscale_fancy: bool):
     """
     Main application entry point.
     """
     app_name = 'Bing Desktop Wallpaper'
     Notify.init(app_name)
     exit_status = 0
+
+    # Setup Notifications
+    path_bing_wallpaper = pathlib.Path(__file__).resolve()
+    path_icon = path_bing_wallpaper.parent / 'icon.svg'
+    if not path_icon.exists():
+        # Fallback to set of included icons
+        # Likely in development environment
+        path_icon = path_bing_wallpaper.parent.parent / 'icon/Bing.svg'
+
+    try:
+        wait_for_internet_connection('https://www.bing.com', 1, 2)
+    except Exception as err:
+        print(err)
+
+        summary = f'Error executing {app_name}'
+        body = str(err)
+        show_notification(summary, str(body), path_icon)
+        sys.exit(1)
+
+    # Determine desktop environment
+    if desktop_environment is None:
+        desktop_environment = 'gnome'
+        source = Gio.SettingsSchemaSource.get_default()
+        cinnamon_exists = source.lookup('org.cinnamon.desktop.background', True)
+        if cinnamon_exists:
+            desktop_environment = 'cinnamon'
 
     try:
         image_metadata = get_image_metadata()
@@ -380,50 +394,114 @@ def main():
 
         download_path = get_download_path()
         init_dir(download_path)
-        image_path = os.path.join(download_path, image_name)
-        
-        if not os.path.isfile(image_path):
-            urlretrieve(image_url, image_path)
-            try:
-                change_background_gnome(image_path)
-            except:
-                change_background_cinnamon(image_path)
-            change_screensaver(image_path)
+        image_path = download_path / image_name
+
+        if not image_path.is_file() or force:
+            urllib.request.urlretrieve(image_url, image_path)
+            change_background(image_path, desktop_environment)
+            change_screensaver(image_path, 'gnome')
             summary = 'Bing Wallpaper updated successfully'
             body = image_metadata.find("copyright").text.encode('utf-8')
 
             text = str(image_name) + " -- " + str(body) + "\n"
             with open(download_path + "/image-details.txt", "a+") as myfile:
                 myfile.write(text)
-        
-        elif os.path.samefile(get_current_background_uri(), image_path):
+
+        elif (
+            get_current_background_uri(desktop_environment).exists() and
+            (get_current_background_uri(desktop_environment).samefile(image_path) or
+             (get_current_background_uri(desktop_environment).parent /
+             '_'.join(get_current_background_uri(desktop_environment).stem.split('_')[:-1])).with_suffix('.jpg')
+                .samefile(image_path)
+             )
+        ):
             summary = 'Bing Wallpaper unchanged'
             body = ('%s already exists in Wallpaper directory' %
                     image_metadata.find("copyright").text.encode('utf-8'))
-        
+
         else:
-            try:
-                change_background_gnome(image_path)
-            except:
-                change_background_cinnamon(image_path)
-            change_screensaver(image_path)
+            change_background(image_path, desktop_environment)
+            change_screensaver(image_path, 'gnome')
             summary = 'Wallpaper changed to current Bing wallpaper'
             body = ('%s already exists in Wallpaper directory' %
                     image_metadata.find("copyright").text.encode('utf-8'))
         check_limit()
-        
+
+        show_notification(summary, str(body), path_icon)
     except Exception as err:
-        summary = 'Error executing %s' % app_name
-        body = err
-        print(body)
-        exit_status = 1
-    
-    os.chdir(path_to_Bing_Wallpapers)
-    icon = os.path.abspath("icon.svg") 
-    app_notification = Notify.Notification.new(summary, str(body), icon)
-    app_notification.show()
+        print(err)
+
+        summary = f'Error executing {app_name}'
+        body = str(err)
+        show_notification(summary, str(body), path_icon)
+        sys.exit(1)
+
+    if upscale_fancy:
+        try:
+            import shutil
+            import skimage.io
+            import upscale_arbsr
+
+            path_background = image_path
+            background = skimage.io.imread(path_background)
+            background_height = background.shape[0]
+            background_width = background.shape[1]
+            del background
+
+            maxw, maxh = get_maximum_screen_resolution()
+            f = max((maxw/background_width), (maxh/background_height))
+            maxw, maxh = int(round(background_width*f)), int(round(background_height*f))
+
+            path_background_upscaled = pathlib.Path(path_background).parent / \
+                (pathlib.Path(path_background).stem + f'_{maxw}x{maxh}.png')
+
+            if (not path_background_upscaled.exists()) or force:
+                assert maxw > background_width and maxh > background_height
+
+                summary = f'{app_name}: Starting Upscaling'
+                body = 'This may take some time'
+                show_notification(summary, str(body), path_icon)
+                path_upscaled = upscale_arbsr.upscale_cpu(path_background, maxw, maxh)
+
+                shutil.move(path_upscaled, path_background_upscaled)
+
+                summary = f'{app_name}: Successfully upscaled'
+                body = f'From {background_width}x{background_height} to {maxw}x{maxh}'
+                show_notification(summary, str(body), path_icon)
+            else:
+                summary = f'{app_name}: Upscaled background already exists'
+                body = f'filename: {path_background_upscaled.name}'
+                show_notification(summary, str(body), path_icon)
+
+            if get_current_background_uri(desktop_environment).samefile(path_background_upscaled):
+                summary = f'{app_name}: Upscaled background already set'
+                body = f'filename: {path_background_upscaled.name}'
+                show_notification(summary, str(body), path_icon)
+            else:
+                change_background(path_background_upscaled, desktop_environment)
+                change_screensaver(path_background_upscaled, 'gnome')
+
+                summary = f'{app_name}: Set to upscaled background'
+                body = f'filename: {path_background_upscaled.name}'
+                show_notification(summary, str(body), path_icon)
+        except Exception as err:
+            print(err)
+
+            summary = f'Warning {app_name}'
+            body = f'Error Upscaling {image_path}\n' + str(err)
+            show_notification(summary, str(body), path_icon)
+
     sys.exit(exit_status)
 
 
 if __name__ == '__main__':
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description='Automatically downloads and changes desktop wallpaper to Bing Photo of the Day.')
+    parser.add_argument('-f', '--force', action='store_true')
+    parser.add_argument('-d', '--desktop_environment', default=None)
+    parser.add_argument('-u', '--upscale-fancy', action='store_true')
+    args = parser.parse_args()
+
+    main(**vars(args))
