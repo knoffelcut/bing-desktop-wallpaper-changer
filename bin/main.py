@@ -404,7 +404,7 @@ def main(force: bool, desktop_environment: str, upscale_fancy: bool):
             body = image_metadata.find("copyright").text.encode('utf-8')
 
             text = str(image_name) + " -- " + str(body) + "\n"
-            with open(download_path + "/image-details.txt", "a+") as myfile:
+            with open(download_path / "image-details.txt", "a+") as myfile:
                 myfile.write(text)
 
         elif (
@@ -433,6 +433,11 @@ def main(force: bool, desktop_environment: str, upscale_fancy: bool):
 
         summary = f'Error executing {app_name}'
         body = str(err)
+        try:
+            import traceback
+            body += '\n' + traceback.format_exc()
+        except:
+            pass
         show_notification(summary, str(body), path_icon)
         sys.exit(1)
 
