@@ -1,20 +1,19 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
-from configparser import ConfigParser
-import urllib.request
-import urllib.error
-from subprocess import check_output
-from gi.repository import Notify
-from gi.repository import Gtk
-from gi.repository import Gio
-import gi
-import xml.etree.ElementTree as ET
 import locale
-import re
-import sys
 import pathlib
+import sys
 import time
+import urllib.error
+import urllib.parse
+import urllib.request
+import xml.etree.ElementTree as ET
+from configparser import ConfigParser
+from subprocess import check_output
+
+import gi
+from gi.repository import Gio, Gtk, Notify
 
 gi.require_version('Gtk', '3.0')
 gi.require_version('Notify', '0.7')
@@ -221,14 +220,14 @@ def get_maximum_screen_resolution():
     return maxw, maxh
 
 
-def get_screen_resolution_str():
+def get_screen_resolution():
     """
     Get a regexp like string with your current screen resolution.
 
     :return: String with your current screen resolution.
     """
     sizes = [[800, [600]], [1024, [768]], [1280, [720, 768]],
-             [1366, [768]], [1920, [1080, 1200]]]
+             [1366, [768]], [1920, [1080, 1200]], [2560, [1440]], [3840, [2160]]]
     sizes_mobile = [[768, [1024]], [720, [1280]],
                     [768, [1280, 1366]], [1080, [1920]]]
     default_w = 1920
@@ -265,7 +264,7 @@ def get_screen_resolution_str():
             sizew = default_w
             sizeh = default_h
 
-    return f'{sizew:d}x{sizeh:d}'
+    return sizew, sizeh
 
 
 def get_image_metadata():
@@ -294,9 +293,10 @@ def get_image_url(metadata):
     base_image = metadata.find("url").text
     # Replace image resolution with the correct resolution
     # from your main monitor
-    screen_size = get_screen_resolution_str()
-    correct_resolution_image = re.sub(r'\d+x\d+', screen_size, base_image)
-    return "https://www.bing.com" + correct_resolution_image
+    image_id = dict(urllib.parse.parse_qsl(base_image[base_image.find("?") + 1:]))["id"]
+    image_id = "_".join(image_id.split("_")[:-1])
+    sizew, sizeh = get_screen_resolution()
+    return f"https://bing.com/th?id={image_id}_UHD.jpg&rf=LaDigue_UHD.jpg&pid=hp&w={sizew}&h={sizeh}"
 
 
 def init_dir(path: pathlib.Path):
@@ -444,6 +444,7 @@ def main(force: bool, desktop_environment: str, upscale_fancy: bool):
     if upscale_fancy:
         try:
             import shutil
+
             import skimage.io
             import upscale_arbsr
 
@@ -460,8 +461,14 @@ def main(force: bool, desktop_environment: str, upscale_fancy: bool):
             path_background_upscaled = pathlib.Path(path_background).parent / \
                 (pathlib.Path(path_background).stem + f'_{maxw}x{maxh}.png')
 
-            if (not path_background_upscaled.exists()) or force:
-                assert maxw > background_width and maxh > background_height
+            skip_upscale = False
+            if maxw <= background_width and maxh <= background_height:
+                skip_upscale = True
+                summary = f'{app_name}: Skipping upscaling, destination size is smaller than source size'
+                body = f'From {background_width}x{background_height} to {maxw}x{maxh}'
+                show_notification(summary, str(body), path_icon)
+            elif (not path_background_upscaled.exists()) or force:
+                assert maxw > background_width or maxh > background_height
 
                 summary = f'{app_name}: Starting Upscaling'
                 body = 'This may take some time'
@@ -478,7 +485,9 @@ def main(force: bool, desktop_environment: str, upscale_fancy: bool):
                 body = f'filename: {path_background_upscaled.name}'
                 show_notification(summary, str(body), path_icon)
 
-            if get_current_background_uri(desktop_environment).samefile(path_background_upscaled):
+            if skip_upscale:
+                pass
+            elif get_current_background_uri(desktop_environment).samefile(path_background_upscaled):
                 summary = f'{app_name}: Upscaled background already set'
                 body = f'filename: {path_background_upscaled.name}'
                 show_notification(summary, str(body), path_icon)
