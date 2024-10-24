@@ -362,7 +362,7 @@ ask_config() {
   if echo "$answer" | grep -iq "^y" ;then
       UPSCALE=-u
   else
-      UPSCALE=false
+      UPSCALE=""
   fi
 
   # Icon
