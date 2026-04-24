@@ -3,6 +3,7 @@
 
 import locale
 import pathlib
+import shutil
 import sys
 import time
 import urllib.error
@@ -15,67 +16,69 @@ from subprocess import check_output
 import gi
 from gi.repository import Gio, Gtk, Notify
 
-gi.require_version('Gtk', '3.0')
-gi.require_version('Notify', '0.7')
+gi.require_version("Gtk", "3.0")
+gi.require_version("Notify", "0.7")
 
-BING_MARKETS = [u'ar-XA',
-                u'bg-BG',
-                u'cs-CZ',
-                u'da-DK',
-                u'de-AT',
-                u'de-CH',
-                u'de-DE',
-                u'el-GR',
-                u'en-AU',
-                u'en-CA',
-                u'en-GB',
-                u'en-ID',
-                u'en-IE',
-                u'en-IN',
-                u'en-MY',
-                u'en-NZ',
-                u'en-PH',
-                u'en-SG',
-                u'en-US',
-                u'en-XA',
-                u'en-ZA',
-                u'es-AR',
-                u'es-CL',
-                u'es-ES',
-                u'es-MX',
-                u'es-US',
-                u'es-XL',
-                u'et-EE',
-                u'fi-FI',
-                u'fr-BE',
-                u'fr-CA',
-                u'fr-CH',
-                u'fr-FR',
-                u'he-IL',
-                u'hr-HR',
-                u'hu-HU',
-                u'it-IT',
-                u'ja-JP',
-                u'ko-KR',
-                u'lt-LT',
-                u'lv-LV',
-                u'nb-NO',
-                u'nl-BE',
-                u'nl-NL',
-                u'pl-PL',
-                u'pt-BR',
-                u'pt-PT',
-                u'ro-RO',
-                u'ru-RU',
-                u'sk-SK',
-                u'sl-SL',
-                u'sv-SE',
-                u'th-TH',
-                u'tr-TR',
-                u'uk-UA',
-                u'zh-CN',
-                u'zh-HK',
-                u'zh-TW']
+BING_MARKETS = [
+    "ar-XA",
+    "bg-BG",
+    "cs-CZ",
+    "da-DK",
+    "de-AT",
+    "de-CH",
+    "de-DE",
+    "el-GR",
+    "en-AU",
+    "en-CA",
+    "en-GB",
+    "en-ID",
+    "en-IE",
+    "en-IN",
+    "en-MY",
+    "en-NZ",
+    "en-PH",
+    "en-SG",
+    "en-US",
+    "en-XA",
+    "en-ZA",
+    "es-AR",
+    "es-CL",
+    "es-ES",
+    "es-MX",
+    "es-US",
+    "es-XL",
+    "et-EE",
+    "fi-FI",
+    "fr-BE",
+    "fr-CA",
+    "fr-CH",
+    "fr-FR",
+    "he-IL",
+    "hr-HR",
+    "hu-HU",
+    "it-IT",
+    "ja-JP",
+    "ko-KR",
+    "lt-LT",
+    "lv-LV",
+    "nb-NO",
+    "nl-BE",
+    "nl-NL",
+    "pl-PL",
+    "pt-BR",
+    "pt-PT",
+    "ro-RO",
+    "ru-RU",
+    "sk-SK",
+    "sl-SL",
+    "sv-SE",
+    "th-TH",
+    "tr-TR",
+    "uk-UA",
+    "zh-CN",
+    "zh-HK",
+    "zh-TW",
+]
 
 config_file_skeleton = """[market]
 # If you want to override the current Bing market detection,
@@ -95,7 +98,7 @@ dir_max_size =
 
 
 def get_file_uri(filename):
-    return f'file://{filename}'
+    return f"file://{filename}"
 
 
 def set_gsetting(schema, key, value):
@@ -105,19 +108,36 @@ def set_gsetting(schema, key, value):
 
 
 def change_background(filename, desktop_environment):
-    set_gsetting(f'org.{desktop_environment}.desktop.background', 'picture-uri',
-                 get_file_uri(filename))
+    # Double apply, with different URIs
+    path_tmp = pathlib.Path("/tmp") / pathlib.Path(filename).name
+    shutil.copy(filename, path_tmp)
+    set_gsetting(
+        f"org.{desktop_environment}.desktop.background",
+        "picture-uri",
+        get_file_uri(str(path_tmp)),
+    )
+    time.sleep(1)  # TODO Can likely make shorter (or wait until set)
+
+    set_gsetting(
+        f"org.{desktop_environment}.desktop.background",
+        "picture-uri",
+        get_file_uri(filename),
+    )
+    path_tmp.unlink()
 
 
 def get_current_background_uri(desktop_environment):
-    gsettings = Gio.Settings.new(f'org.{desktop_environment}.desktop.background')
-    path = gsettings.get_string('picture-uri')
+    gsettings = Gio.Settings.new(f"org.{desktop_environment}.desktop.background")
+    path = gsettings.get_string("picture-uri")
     return pathlib.Path(path[7:])
 
 
 def change_screensaver(filename, desktop_environment):
-    set_gsetting(f'org.{desktop_environment}.desktop.screensaver', 'picture-uri',
-                 get_file_uri(filename))
+    set_gsetting(
+        f"org.{desktop_environment}.desktop.screensaver",
+        "picture-uri",
+        get_file_uri(filename),
+    )
 
 
 def get_config_file():
@@ -126,11 +146,11 @@ def get_config_file():
 
     :return: Path to the program's config file.
     """
-    config_dir = pathlib.Path.home() / '.config/bing-desktop-wallpaper-changer'
+    config_dir = pathlib.Path.home() / ".config/bing-desktop-wallpaper-changer"
     init_dir(config_dir)
-    config_path = config_dir / 'config.ini'
+    config_path = config_dir / "config.ini"
     if not config_path.is_file():
-        with open(config_path, 'w') as config_file:
+        with open(config_path, "w") as config_file:
             config_file.write(config_file_skeleton)
     return config_path
 
@@ -149,7 +169,7 @@ def get_market():
     """
     config = ConfigParser()
     config.read(get_config_file())
-    market_area_override = config.get('market', 'area')
+    market_area_override = config.get("market", "area")
     if market_area_override:
         return market_area_override
 
@@ -157,17 +177,20 @@ def get_market():
     if default_locale in BING_MARKETS:
         return default_locale
 
-    return 'en-US'
+    return "en-US"
 
 
 def get_download_path():
     # By default images are saved to '/home/[user]/[Pictures]/BingWallpapers/'
-    default_path = check_output("xdg-user-dir PICTURES", shell=True).strip().decode("utf-8") + "/BingWallpapers"
+    default_path = (
+        check_output("xdg-user-dir PICTURES", shell=True).strip().decode("utf-8")
+        + "/BingWallpapers"
+    )
 
     try:
         config = ConfigParser()
         config.read(get_config_file())
-        path = config.get('directory', 'dir_path')
+        path = config.get("directory", "dir_path")
 
         return pathlib.Path(path or default_path)
     except Exception:
@@ -181,7 +204,7 @@ def get_directory_limit():
     config = ConfigParser()
     config.read(get_config_file())
     try:
-        size = config.getint('directory', 'dir_max_size')
+        size = config.getint("directory", "dir_max_size")
         return size
     except Exception:
         return 100 * 1024 * 1024
@@ -226,10 +249,16 @@ def get_screen_resolution():
 
     :return: String with your current screen resolution.
     """
-    sizes = [[800, [600]], [1024, [768]], [1280, [720, 768]],
-             [1366, [768]], [1920, [1080, 1200]], [2560, [1440]], [3840, [2160]]]
-    sizes_mobile = [[768, [1024]], [720, [1280]],
-                    [768, [1280, 1366]], [1080, [1920]]]
+    sizes = [
+        [800, [600]],
+        [1024, [768]],
+        [1280, [720, 768]],
+        [1366, [768]],
+        [1920, [1080, 1200]],
+        [2560, [1440]],
+        [3840, [2160]],
+    ]
+    sizes_mobile = [[768, [1024]], [720, [1280]], [768, [1280, 1366]], [1080, [1920]]]
     default_w = 1920
     default_h = 1080
     default_mobile_w = 1080
@@ -279,7 +308,7 @@ def get_image_metadata():
     bing_xml = ET.parse(page).getroot()
 
     # For extracting complete URL of the image
-    images = bing_xml.findall('image')
+    images = bing_xml.findall("image")
     return images[0]
 
 
@@ -293,7 +322,9 @@ def get_image_url(metadata):
     base_image = metadata.find("url").text
     # Replace image resolution with the correct resolution
     # from your main monitor
-    image_id = dict(urllib.parse.parse_qsl(base_image[base_image.find("?") + 1:]))["id"]
+    image_id = dict(urllib.parse.parse_qsl(base_image[base_image.find("?") + 1 :]))[
+        "id"
+    ]
     image_id = "_".join(image_id.split("_")[:-1])
     sizew, sizeh = get_screen_resolution()
     return f"https://bing.com/th?id={image_id}_UHD.jpg&rf=LaDigue_UHD.jpg&pid=hp&w={sizew}&h={sizeh}"
@@ -313,7 +344,7 @@ def p2_dirscan(path):
     size = 0
 
     for entry in path.iterdir():
-        if entry.is_file() and entry.suffix in {'.jpg', '.png'}:
+        if entry.is_file() and entry.suffix in {".jpg", ".png"}:
             s = entry.stat().st_size
             files.append((entry, s))
             size = size + s
@@ -325,7 +356,7 @@ def check_limit():
     download_path = get_download_path()
     (files, size) = p2_dirscan(download_path)
     max_size = get_directory_limit()
-    while (max_size > 0 and size > max_size and len(files) > 1):
+    while max_size > 0 and size > max_size and len(files) > 1:
         files[0][0].unlink()
         size = size - files[0][1]
         del files[0]
@@ -353,39 +384,41 @@ def show_notification(summary: str, body: str, path_icon: pathlib.Path):
     app_notification.show()
 
 
-def main(force: bool, desktop_environment: str, upscale_fancy: bool):
+def main(
+    force: bool, force_change: bool, desktop_environment: str, upscale_fancy: bool
+):
     """
     Main application entry point.
     """
-    app_name = 'Bing Desktop Wallpaper'
+    app_name = "Bing Desktop Wallpaper"
     Notify.init(app_name)
     exit_status = 0
 
     # Setup Notifications
     path_bing_wallpaper = pathlib.Path(__file__).resolve()
-    path_icon = path_bing_wallpaper.parent / 'icon.svg'
+    path_icon = path_bing_wallpaper.parent / "icon.svg"
     if not path_icon.exists():
         # Fallback to set of included icons
         # Likely in development environment
-        path_icon = path_bing_wallpaper.parent.parent / 'icon/Bing.svg'
+        path_icon = path_bing_wallpaper.parent.parent / "icon/Bing.svg"
 
     try:
-        wait_for_internet_connection('https://www.bing.com', 1, 2)
+        wait_for_internet_connection("https://www.bing.com", 1, 2)
     except Exception as err:
         print(err)
 
-        summary = f'Error executing {app_name}'
+        summary = f"Error executing {app_name}"
         body = str(err)
         show_notification(summary, str(body), path_icon)
         sys.exit(1)
 
     # Determine desktop environment
     if desktop_environment is None:
-        desktop_environment = 'gnome'
+        desktop_environment = "gnome"
         source = Gio.SettingsSchemaSource.get_default()
-        cinnamon_exists = source.lookup('org.cinnamon.desktop.background', True)
+        cinnamon_exists = source.lookup("org.cinnamon.desktop.background", True)
         if cinnamon_exists:
-            desktop_environment = 'cinnamon'
+            desktop_environment = "cinnamon"
 
     try:
         image_metadata = get_image_metadata()
@@ -396,46 +429,48 @@ def main(force: bool, desktop_environment: str, upscale_fancy: bool):
         init_dir(download_path)
         image_path = download_path / image_name
 
+        background_match = (
+            image_path.is_file()
+            and get_current_background_uri(desktop_environment).exists()
+            and get_current_background_uri(desktop_environment).samefile(image_path)
+        )
+
         if not image_path.is_file() or force:
             urllib.request.urlretrieve(image_url, image_path)
             change_background(image_path, desktop_environment)
-            change_screensaver(image_path, 'gnome')
-            summary = 'Bing Wallpaper updated successfully'
-            body = image_metadata.find("copyright").text.encode('utf-8')
+            change_screensaver(image_path, "gnome")
+            summary = "Bing Wallpaper updated successfully"
+            body = image_metadata.find("copyright").text.encode("utf-8")
 
             text = str(image_name) + " -- " + str(body) + "\n"
             with open(download_path / "image-details.txt", "a+") as myfile:
                 myfile.write(text)
 
-        elif (
-            get_current_background_uri(desktop_environment).exists() and
-            (get_current_background_uri(desktop_environment).samefile(image_path) or
-             (get_current_background_uri(desktop_environment).parent /
-             '_'.join(get_current_background_uri(desktop_environment).stem.split('_')[:-1])).with_suffix('.jpg')
-                .samefile(image_path)
-             )
-        ):
-            summary = 'Bing Wallpaper unchanged'
-            body = ('%s already exists in Wallpaper directory' %
-                    image_metadata.find("copyright").text.encode('utf-8'))
+        elif (not force_change) and background_match:
+            summary = "Bing Wallpaper unchanged"
+            body = "%s already exists in Wallpaper directory" % image_metadata.find(
+                "copyright"
+            ).text.encode("utf-8")
 
         else:
             change_background(image_path, desktop_environment)
-            change_screensaver(image_path, 'gnome')
-            summary = 'Wallpaper changed to current Bing wallpaper'
-            body = ('%s already exists in Wallpaper directory' %
-                    image_metadata.find("copyright").text.encode('utf-8'))
+            change_screensaver(image_path, "gnome")
+            summary = "Wallpaper changed to current Bing wallpaper"
+            body = "%s already exists in Wallpaper directory" % image_metadata.find(
+                "copyright"
+            ).text.encode("utf-8")
         check_limit()
 
         show_notification(summary, str(body), path_icon)
     except Exception as err:
         print(err)
 
-        summary = f'Error executing {app_name}'
+        summary = f"Error executing {app_name}"
         body = str(err)
         try:
             import traceback
-            body += '\n' + traceback.format_exc()
+
+            body += "\n" + traceback.format_exc()
         except:
             pass
         show_notification(summary, str(body), path_icon)
@@ -455,67 +490,74 @@ def main(force: bool, desktop_environment: str, upscale_fancy: bool):
             del background
 
             maxw, maxh = get_maximum_screen_resolution()
-            f = max((maxw/background_width), (maxh/background_height))
-            maxw, maxh = int(round(background_width*f)), int(round(background_height*f))
+            f = max((maxw / background_width), (maxh / background_height))
+            maxw, maxh = int(round(background_width * f)), int(
+                round(background_height * f)
+            )
 
-            path_background_upscaled = pathlib.Path(path_background).parent / \
-                (pathlib.Path(path_background).stem + f'_{maxw}x{maxh}.png')
+            path_background_upscaled = pathlib.Path(path_background).parent / (
+                pathlib.Path(path_background).stem + f"_{maxw}x{maxh}.png"
+            )
 
             skip_upscale = False
             if maxw <= background_width and maxh <= background_height:
                 skip_upscale = True
-                summary = f'{app_name}: Skipping upscaling, destination size is smaller than source size'
-                body = f'From {background_width}x{background_height} to {maxw}x{maxh}'
+                summary = f"{app_name}: Skipping upscaling, destination size is smaller than source size"
+                body = f"From {background_width}x{background_height} to {maxw}x{maxh}"
                 show_notification(summary, str(body), path_icon)
             elif (not path_background_upscaled.exists()) or force:
                 assert maxw > background_width or maxh > background_height
 
-                summary = f'{app_name}: Starting Upscaling'
-                body = 'This may take some time'
+                summary = f"{app_name}: Starting Upscaling"
+                body = "This may take some time"
                 show_notification(summary, str(body), path_icon)
                 path_upscaled = upscale_arbsr.upscale_cpu(path_background, maxw, maxh)
 
                 shutil.move(path_upscaled, path_background_upscaled)
 
-                summary = f'{app_name}: Successfully upscaled'
-                body = f'From {background_width}x{background_height} to {maxw}x{maxh}'
+                summary = f"{app_name}: Successfully upscaled"
+                body = f"From {background_width}x{background_height} to {maxw}x{maxh}"
                 show_notification(summary, str(body), path_icon)
             else:
-                summary = f'{app_name}: Upscaled background already exists'
-                body = f'filename: {path_background_upscaled.name}'
+                summary = f"{app_name}: Upscaled background already exists"
+                body = f"filename: {path_background_upscaled.name}"
                 show_notification(summary, str(body), path_icon)
 
             if skip_upscale:
                 pass
-            elif get_current_background_uri(desktop_environment).samefile(path_background_upscaled):
-                summary = f'{app_name}: Upscaled background already set'
-                body = f'filename: {path_background_upscaled.name}'
+            elif get_current_background_uri(desktop_environment).samefile(
+                path_background_upscaled
+            ):
+                summary = f"{app_name}: Upscaled background already set"
+                body = f"filename: {path_background_upscaled.name}"
                 show_notification(summary, str(body), path_icon)
             else:
                 change_background(path_background_upscaled, desktop_environment)
-                change_screensaver(path_background_upscaled, 'gnome')
+                change_screensaver(path_background_upscaled, "gnome")
 
-                summary = f'{app_name}: Set to upscaled background'
-                body = f'filename: {path_background_upscaled.name}'
+                summary = f"{app_name}: Set to upscaled background"
+                body = f"filename: {path_background_upscaled.name}"
                 show_notification(summary, str(body), path_icon)
         except Exception as err:
             print(err)
 
-            summary = f'Warning {app_name}'
-            body = f'Error Upscaling {image_path}\n' + str(err)
+            summary = f"Warning {app_name}"
+            body = f"Error Upscaling {image_path}\n" + str(err)
             show_notification(summary, str(body), path_icon)
 
     sys.exit(exit_status)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(
-        description='Automatically downloads and changes desktop wallpaper to Bing Photo of the Day.')
-    parser.add_argument('-f', '--force', action='store_true')
-    parser.add_argument('-d', '--desktop_environment', default=None)
-    parser.add_argument('-u', '--upscale-fancy', action='store_true')
+        description="Automatically downloads and changes desktop wallpaper to Bing Photo of the Day."
+    )
+    parser.add_argument("-f", "--force", action="store_true")
+    parser.add_argument("-c", "--force_change", action="store_true")
+    parser.add_argument("-d", "--desktop_environment", default=None)
+    parser.add_argument("-u", "--upscale-fancy", action="store_true")
     args = parser.parse_args()
 
     main(**vars(args))
