@@ -14,9 +14,9 @@ from configparser import ConfigParser
 from subprocess import check_output
 
 import gi
-from gi.repository import Gio, Gtk, Notify
+from gi.repository import Gio, Gtk, Notify, Gdk
 
-gi.require_version("Gtk", "3.0")
+gi.require_version("Gtk", "4.0")
 gi.require_version("Notify", "0.7")
 
 BING_MARKETS = [
@@ -225,20 +225,22 @@ def get_bing_xml():
 
 
 def get_maximum_screen_resolution():
-    window = Gtk.Window()
-    screen = window.get_screen()
-    nmons = screen.get_n_monitors()
+    display = Gdk.Display.get_default()
+    nmons = display.get_n_monitors()
     maxw = 0
     maxh = 0
     if nmons == 1:
-        maxw = screen.get_width()
-        maxh = screen.get_height()
+        monitor = display.get_monitor(0)
+        geometry = monitor.get_geometry()
+        maxw = geometry.width
+        maxh = geometry.height
     else:
         for m in range(nmons):
-            mg = screen.get_monitor_geometry(m)
-            if mg.width > maxw or mg.height > maxw:
-                maxw = mg.width
-                maxh = mg.height
+            monitor = display.get_monitor(m)
+            geometry = monitor.get_geometry()
+            if geometry.width > maxw or geometry.height > maxh:
+                maxw = geometry.width
+                maxh = geometry.height
 
     return maxw, maxh
 
